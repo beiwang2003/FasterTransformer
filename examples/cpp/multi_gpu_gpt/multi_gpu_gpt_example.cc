@@ -256,7 +256,7 @@ void multi_gpu_gpt_example(const INIReader reader, std::string in_csv)
     cudaDeviceSynchronize();
     gettimeofday(&start, NULL);
 
-    ite = 10;
+    ite = 2;
 
     for (int i = 0; i < ite; ++i) {
         PUSH_RANGE("batch");
