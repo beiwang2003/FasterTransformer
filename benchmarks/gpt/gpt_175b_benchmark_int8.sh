@@ -14,6 +14,9 @@
 
 #!/bin/bash
 
+apt-get update
+apt-get install bc
+
 export NVIDIA_TF32_OVERRIDE=0
 pipeline_para_size=1
 for tensor_para_size in 8 4 2;
@@ -46,7 +49,7 @@ do
 	topk=200
 	topp=0.95
 	temperature=0.5
-	int8_mode=0
+	int8_mode=1
 
 	for request_batch_size in 1 4 16;
 	do
@@ -55,7 +58,7 @@ do
 		for request_output_len in 128;
 		do
     
-		    tmp_log=${logdir}/bs-${request_batch_size}-input_len-${input_length}-${request_output_len}.log
+		    tmp_log=${logdir}/bs-${request_batch_size}-input_len-${input_length}-output_len-${request_output_len}.log
 
 		    python ../examples/pytorch/gpt/utils/generate_start_ids.py --max_batch_size ${request_batch_size} --max_input_length ${input_length}
 		    ./bin/gpt_gemm ${request_batch_size} ${beam_width} ${input_length} ${head_num} ${size_per_head} ${inter_size} ${vocab_size} 1 ${tensor_para_size} 0
@@ -83,7 +86,7 @@ do
 				  -v input_length=${input_length} \
 				  -v request_output_len="$request_output_len" \
 				  -v model_size=${model_size} \
-				  '{printf "| %5s | %3d | %4d | %4d | FP16 | %7.2f |\n", model_size, batch_size, input_length, request_output_len, ft_latency}' >> $all_log
+				  '{printf "| %5s | %3d | %4d | %4d | INT8 | %7.2f |\n", model_size, batch_size, input_length, request_output_len, ft_latency}' >> $all_log
 		    
 		    rm .tmp.config.ini
 		    
