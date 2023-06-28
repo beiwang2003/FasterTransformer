@@ -14,18 +14,15 @@
 
 #!/bin/bash
 
-apt-get update
-apt-get install bc
-
 export NVIDIA_TF32_OVERRIDE=0
 pipeline_para_size=1
-for tensor_para_size in 8 4 2;
+for tensor_para_size in 8 4 ;#2;
 do
-    total_gpu_count=$(echo "scale=2; ${tensor_para_size} * ${pipeline_para_size} " | bc)
+    total_gpu_count=$((tensor_para_size * pipeline_para_size ))
 
     vocab_size=51200
     
-    logdir="gpt-TP${tensor_para_size}-PP${pipeline_para_size}-log"
+    logdir="perf/int8/gpt-TP${tensor_para_size}-PP${pipeline_para_size}-log"
     if [ ! -f ${logdir} ]; then
 	mkdir ${logdir} -p
     fi
@@ -42,8 +39,8 @@ do
     do
 	head_num=96
 	size_per_head=128
-	inter_size=$(echo "scale=2; $head_num * ${size_per_head} * 4 " | bc)
-	num_layer=48
+	inter_size=$((head_num * size_per_head * 4))
+	num_layer=96
 
 	beam_width=1
 	topk=200
@@ -81,6 +78,8 @@ do
 			   --int8_mode ${int8_mode}
 		    mpirun -n ${total_gpu_count} --allow-run-as-root ./bin/multi_gpu_gpt_example .tmp.config.ini 2>&1 | tee ${tmp_log}
 		    ft_latency=`tail -n 1 ${tmp_log} | head -n 1 | awk '{print $17}'`
+		    #FT_NVTX=ON nsys profile -s none -t cuda,nvtx,osrt --force-overwrite=true -o ${logdir}/bs-${request_batch_size}-int8_mode-${int8_mode}-layers-${num_layer} --capture-range=cudaProfilerApi --capture-range-end=stop mpirun -n ${total_gpu_count} --allow-run-as-root ./bin/multi_gpu_gpt_example .tmp.config.int 2>&1 | tee ${tmp_log}
+		    #ft_latency=`tail -n 5 ${tmp_log} | head -n 1 | awk '{print $17}'`
 		    echo "" | awk -v ft_latency=$ft_latency \
 				  -v batch_size=$request_batch_size \
 				  -v input_length=${input_length} \
