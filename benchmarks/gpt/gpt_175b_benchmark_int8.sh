@@ -78,8 +78,7 @@ do
 			   --int8_mode ${int8_mode}
 		    mpirun -n ${total_gpu_count} --allow-run-as-root ./bin/multi_gpu_gpt_example .tmp.config.ini 2>&1 | tee ${tmp_log}
 		    ft_latency=`tail -n 1 ${tmp_log} | head -n 1 | awk '{print $17}'`
-		    #FT_NVTX=ON nsys profile -s none -t cuda,nvtx,osrt --force-overwrite=true -o ${logdir}/bs-${request_batch_size}-int8_mode-${int8_mode}-layers-${num_layer} --capture-range=cudaProfilerApi --capture-range-end=stop mpirun -n ${total_gpu_count} --allow-run-as-root ./bin/multi_gpu_gpt_example .tmp.config.int 2>&1 | tee ${tmp_log}
-		    #ft_latency=`tail -n 5 ${tmp_log} | head -n 1 | awk '{print $17}'`
+
 		    echo "" | awk -v ft_latency=$ft_latency \
 				  -v batch_size=$request_batch_size \
 				  -v input_length=${input_length} \

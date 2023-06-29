@@ -16,13 +16,13 @@
 
 export NVIDIA_TF32_OVERRIDE=0
 pipeline_para_size=1
-for tensor_para_size in 8; # 4 2;
+for tensor_para_size in 8 4 2;
 do
-    total_gpu_count=$((pipeline_para_size * tensor_para_size))
+    total_gpu_count=$(( pipeline_para_size * tensor_para_size))
 
     vocab_size=51200
     
-    logdir="perf/fp16/gpt-TP${tensor_para_size}-PP${pipeline_para_size}-log"
+    logdir="profiler/fp16/gpt-TP${tensor_para_size}-PP${pipeline_para_size}-log"
     if [ ! -f ${logdir} ]; then
 	mkdir ${logdir} -p
     fi
@@ -40,7 +40,7 @@ do
 	head_num=96
 	size_per_head=128
 	inter_size=$((head_num * size_per_head * 4))
-	num_layer=96
+	num_layer=24
 
 	beam_width=1
 	topk=200
@@ -55,7 +55,7 @@ do
 		for request_output_len in 128;
 		do
     
-		    tmp_log=${logdir}/bs-${request_batch_size}-input_len-${input_length}-output_len-${request_output_len}.log
+		    tmp_log=${logdir}/bs-${request_batch_size}-input_len-${input_length}-${request_output_len}.log
 
 		    python ../examples/pytorch/gpt/utils/generate_start_ids.py --max_batch_size ${request_batch_size} --max_input_length ${input_length}
 		    ./bin/gpt_gemm ${request_batch_size} ${beam_width} ${input_length} ${head_num} ${size_per_head} ${inter_size} ${vocab_size} 1 ${tensor_para_size} 0
@@ -76,15 +76,8 @@ do
                            -request_batch_size ${request_batch_size} \
                            --request_output_len ${request_output_len} \
 			   --int8_mode ${int8_mode}
-		    mpirun -n ${total_gpu_count} --allow-run-as-root ./bin/multi_gpu_gpt_example .tmp.config.ini 2>&1 | tee ${tmp_log}
-		    ft_latency=`tail -n 1 ${tmp_log} | head -n 1 | awk '{print $17}'`
-
-		    echo "" | awk -v ft_latency=$ft_latency \
-				  -v batch_size=$request_batch_size \
-				  -v input_length=${input_length} \
-				  -v request_output_len="$request_output_len" \
-				  -v model_size=${model_size} \
-				  '{printf "| %5s | %3d | %4d | %4d | FP16 | %7.2f |\n", model_size, batch_size, input_length, request_output_len, ft_latency}' >> $all_log
+		    
+		    FT_NVTX=ON nsys profile -s none -t cuda,nvtx,osrt --force-overwrite=true -o ${logdir}/bs-${request_batch_size}-int8_mode-${int8_mode}-layers-${num_layer} --capture-range=cudaProfilerApi --capture-range-end=stop  mpirun -n ${total_gpu_count} --allow-run-as-root ./bin/multi_gpu_gpt_example .tmp.config.ini
 		    
 		    rm .tmp.config.ini
 		    
